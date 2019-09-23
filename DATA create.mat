@@ -1,0 +1,555 @@
+
+clear all;
+clc;
+close all;
+tic
+KE=800;
+N_step=20*KE; 
+k_source=50;
+kstart=200;
+kend=600;
+epsilon_0=8.85e-12;
+epsilon_1=epsilon_0/epsilon_0;
+mu_0=4*pi*1e-7;
+mu_1=mu_0/mu_0;
+c=3e8;
+
+
+kk=201;                    
+f_max=100e9;
+omega=2*pi*f_max;
+wl=100;
+lambda=c/f_max;
+dz=lambda/wl;
+dt=lambda/(2*c*wl);
+tau=128*dt;%延时
+t0=0.8*tau;
+
+
+vc=20e9;
+k_vc=length(vc);
+wb=2*pi*30e9;
+theta=90*pi/180;
+wb_y=wb*sin(theta);
+wb_z=wb*cos(theta);
+fp0=40e9;
+
+
+for i=1:kstart
+    F(i)=0;
+end
+for i=kend+1:KE
+    F(i)=0;
+end
+for i=kstart:kend
+    F(i)=1;
+end
+d=(kend-kstart)*dz;
+mu_p=1;
+fp=fp0*F;   
+wp=2*pi*fp0; 
+wp0=2*pi*fp0;
+f=0e9:0.5e9:100e9;
+w=2*pi*f;
+k0=w./c;
+
+
+epsilon_p_L=1-wp0^2./w.^2./((1-1i*vc./w-wb^2*sin(theta)^2./w.^2/2./(1-wp0^2./w.^2-1i*vc./w))-...
+                               sqrt(wb^4*sin(theta)^4./w.^4/4./(1-wp0^2./w.^2-1i*vc./w).^2+wb^2*cos(theta)^2./w.^2));
+                           
+kp_L=2*pi*f.*sqrt(epsilon_p_L.*mu_p)/c;
+r_L=(epsilon_p_L-1)./(-2*sqrt(epsilon_p_L).*coth(1i*kp_L*d)-epsilon_p_L-1);
+t_L=2*sqrt(epsilon_p_L)./(exp(-1i*k0*d).*(2*sqrt(epsilon_p_L).*cosh(1i*kp_L*d)+(1+epsilon_p_L).*sinh(1i*kp_L*d)));
+R_L=20*log10(abs(r_L));
+T_L=20*log10(abs(t_L));
+A_L=10*log10(1-abs(r_L).^2-abs(t_L).^2);
+
+epsilon_p_R=1-wp0^2./w.^2./((1-1i*vc./w-wb^2*sin(theta)^2./w.^2/2./(1-wp0^2./w.^2-1i*vc./w))+...
+                               sqrt(wb^4*sin(theta)^4./w.^4/4./(1-wp0^2./w.^2-1i*vc./w).^2+wb^2*cos(theta)^2./w.^2));
+
+kp_R=2*pi*f.*sqrt(epsilon_p_R.*mu_p)/c;
+r_R=(epsilon_p_R-1)./(-2*sqrt(epsilon_p_R).*coth(1i*kp_R*d)-epsilon_p_R-1);
+t_R=2*sqrt(epsilon_p_R)./(exp(-1i*k0*d).*(2*sqrt(epsilon_p_R).*cosh(1i*kp_R*d)+(1+epsilon_p_R).*sinh(1i*kp_R*d)));
+R_R=20*log10(abs(r_R));
+T_R=20*log10(abs(t_R));
+A_R=10*log10(1-abs(r_R).^2-abs(t_R).^2);
+P_r_RCP=atan2(imag(r_R),real(r_R))*180/pi;
+P_t_RCP=atan2(imag(t_R),real(t_R))*180/pi;
+P_r_LCP=atan2(imag(r_L),real(r_L))*180/pi;
+P_t_LCP=atan2(imag(t_L),real(t_L))*180/pi;
+
+
+Ex=zeros(k_vc,KE+1);
+Ey=zeros(k_vc,KE+1);
+Ez=zeros(k_vc,KE+1);
+Hx=zeros(k_vc,KE+1);
+Hy=zeros(k_vc,KE+1);
+Hz=zeros(k_vc,KE+1);
+
+
+Exr_w(k_vc,kk)=0;
+Ext_w(k_vc,kk)=0;
+Eyr_w(k_vc,kk)=0;
+Eyt_w(k_vc,kk)=0;
+Ezr_w(k_vc,kk)=0;
+Ezt_w(k_vc,kk)=0;
+
+Ex_rw(k_vc,kk)=0;
+Ex_tw(k_vc,kk)=0;
+Ey_rw(k_vc,kk)=0;
+Ey_tw(k_vc,kk)=0;
+Ez_rw(k_vc,kk)=0;
+Ez_tw(k_vc,kk)=0;
+Er_RCP(k_vc,kk)=0;
+Er_LCP(k_vc,kk)=0;
+Et_RCP(k_vc,kk)=0;
+Et_LCP(k_vc,kk)=0;
+
+
+Ex_low_m1(1:k_vc)=0;
+Ex_low_m2(1:k_vc)=0;
+Ex_high_m1(1:k_vc)=0;
+Ex_high_m2(1:k_vc)=0;
+Ey_low_m1(1:k_vc)=0;
+Ey_low_m2(1:k_vc)=0;
+Ey_high_m1(1:k_vc)=0;
+Ey_high_m2(1:k_vc)=0;
+Ez_low_m1(1:k_vc)=0;
+Ez_low_m2(1:k_vc)=0;
+Ez_high_m1(1:k_vc)=0;
+Ez_high_m2(1:k_vc)=0;
+
+
+
+
+Ex_p=zeros(k_vc,KE+1);
+Ey_p=zeros(k_vc,KE+1);
+Ez_p=zeros(k_vc,KE+1);
+
+
+Ex_plasma=zeros(N_step,KE+1);
+Ey_plasma=zeros(N_step,KE+1);
+Ez_plasma=zeros(N_step,KE+1);
+
+Ex_plasma_r=zeros(N_step,1);
+Ey_plasma_r=zeros(N_step,1);
+Ez_plasma_r=zeros(N_step,1);
+Ex_plasma_t=zeros(N_step,1);
+Ey_plasma_t=zeros(N_step,1);
+Ez_plasma_t=zeros(N_step,1);
+
+Hx_plasma=zeros(N_step,KE+1);
+Hy_plasma=zeros(N_step,KE+1);
+Hz_plasma=zeros(N_step,KE+1);
+
+Jx_plasma=zeros(N_step,KE+1);
+Jy_plasma=zeros(N_step,KE+1);
+Jz_plasma=zeros(N_step,KE+1);
+
+Ex_unplasma=zeros(N_step,KE+1);
+Ey_unplasma=zeros(N_step,KE+1);
+Ez_unplasma=zeros(N_step,KE+1);
+
+
+Hx_p=zeros(k_vc,KE+1);
+Hy_p=zeros(k_vc,KE+1);
+Hz_p=zeros(k_vc,KE+1);
+Jx_p=zeros(k_vc,KE+1);
+Jxm1_p=zeros(k_vc,KE+1);
+Jy_p=zeros(k_vc,KE+1);
+Jym1_p=zeros(k_vc,KE+1);
+Jz_p=zeros(k_vc,KE+1);
+Jzm1_p=zeros(k_vc,KE+1);
+
+GA_p=zeros(k_vc,KE+1);
+GB_p=zeros(k_vc,KE+1);
+GD_p=zeros(k_vc,KE+1);
+GF_p=zeros(k_vc,KE+1);
+GC_p=zeros(k_vc,KE+1);
+GE_p=zeros(k_vc,KE+1);
+GG_p=zeros(k_vc,KE+1);
+GH_p=zeros(k_vc,KE+1);
+GI_p=zeros(k_vc,KE+1);
+GJ_p=zeros(k_vc,KE+1);
+GK_p=zeros(k_vc,KE+1);
+GL_p=zeros(k_vc,KE+1);
+GM_p=zeros(k_vc,KE+1);
+GN_p=zeros(k_vc,KE+1);
+GO_p=zeros(k_vc,KE+1);
+GP_p=zeros(k_vc,KE+1);
+
+Ex_low_m1_p(1:k_vc)=0;
+Ex_low_m2_p(1:k_vc)=0;
+Ex_high_m1_p(1:k_vc)=0;
+Ex_high_m2_p(1:k_vc)=0;
+pulse(1:N_step)=0;
+Ey_low_m1_p(1:k_vc)=0;
+Ey_low_m2_p(1:k_vc)=0;
+Ey_high_m1_p(1:k_vc)=0;
+Ey_high_m2_p(1:k_vc)=0;
+Ez_low_m1_p(1:k_vc)=0;
+Ez_low_m2_p(1:k_vc)=0;
+Ez_high_m1_p(1:k_vc)=0;
+Ez_high_m2_p(1:k_vc)=0;
+
+
+C1=1+wb_y^2*dt^2*exp(-vc*dt)/4+wb_z^2*dt^2*exp(-vc*dt)/4;
+for m=1:k_vc
+for n=kstart:kend 
+    %Jx
+    GA_p(m,n)=1/C1(m)*(1-wb_y^2*dt^2/4-wb_z^2*dt^2/4)*exp(-vc(m)*dt);%Jx:n-1/2
+    GB_p(m,n)=1/C1(m)*(epsilon_1*epsilon_0)*dt*wp0^2*exp(-vc(m)*dt/2);%Ex:n
+    GC_p(m,n)=1/(2*C1(m))*wb_z*dt*exp(-vc(m)*dt/2)*(1+exp(-vc(m)*dt));%Jy:n-1/2
+    GD_p(m,n)=1/(2*C1(m))*wb_z*(epsilon_1*epsilon_0)*dt^2*wp0^2*exp(-vc(m)*dt);%Ey:n
+    
+    GE_p(m,n)=1/(2*C1(m))*wb_y*dt*exp(-vc(m)*dt/2)*(1+exp(-vc(m)*dt));%Jz:n-1/2
+    GF_p(m,n)=1/(2*C1(m))*wb_y*(epsilon_1*epsilon_0)*dt^2*wp0^2*exp(-vc(m)*dt);%Ez:n
+     
+    %Jy
+    GG_p(m,n)=(1-dt^2*wb_z^2/4/C1(m)*(1+exp(-vc(m)*dt)))*exp(-vc(m)*dt);%Jy:n-1/2
+    GH_p(m,n)=(epsilon_1*epsilon_0)*dt*wp0^2*exp(-vc(m)*dt/2)*(1-wb_z^2*dt^2*exp(-vc(m)*dt)/4/C1(m));%Ey:n
+    GI_p(m,n)=1/2*dt*wb_z*exp(-vc(m)*dt/2)*(1+exp(-vc(m)*dt)/C1(m)*(1-dt^2*wb_y^2/4-dt^2*wb_z^2/4));%Jx:n-1/2
+    GJ_p(m,n)=1/(2*C1(m))*dt^2*wp0^2*wb_z*(epsilon_1*epsilon_0)*exp(-vc(m)*dt);%Ex:n
+    GK_p(m,n)=dt^2*wb_z*wb_y*exp(-vc(m)*dt)*(1+exp(-vc(m)*dt))/4/C1(m);%Jz:n-1/2,Jy:n-1/2
+    GL_p(m,n)=dt^3*wb_y*wb_z*(epsilon_1*epsilon_0)*wp0^2*exp(-3*vc(m)*dt/2)/4/C1(m);%Ez:n,Ey:n
+    
+    %Jz
+    GM_p(m,n)=(1-dt^2*wb_y^2/4/C1(m)*(1+exp(-vc(m)*dt)))*exp(-vc(m)*dt);%Jz:n-1/2
+    GN_p(m,n)=(epsilon_1*epsilon_0)*dt*wp0^2*exp(-vc(m)*dt/2)*(1-wb_y^2*dt^2*exp(-vc(m)*dt)/4/C1(m));%Ez:n
+    GO_p(m,n)=1/2*dt*wb_y*exp(-vc(m)*dt/2)*(1+exp(-vc(m)*dt)/C1(m)*(1-dt^2*wb_y^2/4-dt^2*wb_z^2/4));%Jx:n-1/2
+    GP_p(m,n)=1/(2*C1(m))*dt^2*wp0^2*wb_y*(epsilon_1*epsilon_0)*exp(-vc(m)*dt);%Ex:n
+    
+end
+end
+
+
+for n=1:N_step
+pulse(n)=(n*dt-t0)/tau*exp(-4*pi*(t0-n*dt)^2/tau^2);%%源
+end
+K_LCP=zeros(k_vc,kk);
+  K_RCP=zeros(k_vc,kk);
+   freq=zeros(1,kk);
+   omegadt=zeros(1,kk);
+
+for m=1:k_vc
+for n=1:kk
+    freq(n)=0e9+(n-1)*20e9/40;
+    omegadt(n)=2*pi*freq(n)*dt;
+    w=2*pi*freq(n);
+    
+     K_RCP(m,n)=-sqrt(-1)*(wb*sin(theta)^2/w/2/(1-sqrt(-1)*vc(m)/w-(wp/w)^2)+sqrt(wb^2*sin(theta)^4/w^2/4/(1-sqrt(-1)*vc(m)/w-(wp/w)^2)^2+cos(theta)^2))/cos(theta);
+     K_LCP(m,n)=-sqrt(-1)*(wb*sin(theta)^2/w/2/(1-sqrt(-1)*vc(m)/w-(wp/w)^2)-sqrt(wb^2*sin(theta)^4/w^2/4/(1-sqrt(-1)*vc(m)/w-(wp/w)^2)^2+cos(theta)^2))/cos(theta);
+    
+end
+end
+
+  for kv=1:k_vc
+for n=1:N_step
+
+for i=2:KE
+      Ex(kv,i)=Ex(kv,i)+dt/(epsilon_1*epsilon_0)/dz*(Hy(kv,i-1)-Hy(kv,i));   
+      Ey(kv,i)=Ey(kv,i)-dt/(epsilon_1*epsilon_0)/dz*(Hx(kv,i-1)-Hx(kv,i)); 
+      Ez(kv,i)=Ez(kv,i); 
+end 
+Ex(kv,k_source)=Ex(kv,k_source)+pulse(n);
+    
+
+for m=1:kk
+
+     Exr_w(kv,m)=Exr_w(kv,m)+Ex(kv,kstart-1)*exp(-sqrt(-1)*omegadt(m)*n);
+
+       Ext_w(kv,m)=Ext_w(kv,m)+Ex(kv,kend+1)*exp(-sqrt(-1)*omegadt(m)*n);
+       %% Ey
+       Eyr_w(kv,m)=Eyr_w(kv,m)+Ey(kv,kstart-1)*exp(-sqrt(-1)*omegadt(m)*n);
+       Eyt_w(kv,m)=Eyt_w(kv,m)+Ey(kv,kend+1)*exp(-sqrt(-1)*omegadt(m)*n);
+      Ezr_w(kv,m)=Ezr_w(kv,m)+Ez(kv,kstart-1)*exp(-sqrt(-1)*omegadt(m)*n);
+       Ezt_w(kv,m)=Ezt_w(kv,m)+Ez(kv,kend+1)*exp(-sqrt(-1)*omegadt(m)*n);
+      
+    
+end     
+
+Ex(kv,1)=Ex_low_m2(kv);
+Ex_low_m2(kv)=Ex_low_m1(kv);
+Ex_low_m1(kv)=Ex(kv,2);
+Ex(kv,KE+1)=Ex_high_m2(kv);
+Ex_high_m2(kv)=Ex_high_m1(kv);
+Ex_high_m1(kv)=Ex(kv,KE);
+
+Ey(kv,1)=Ey_low_m2(kv);
+Ey_low_m2(kv)=Ey_low_m1(kv);
+Ey_low_m1(kv)=Ey(kv,2);
+Ey(kv,KE+1)=Ey_high_m2(kv);
+Ey_high_m2(kv)=Ey_high_m1(kv);
+Ey_high_m1(kv)=Ey(kv,KE);
+
+Ez(kv,1)=Ez_low_m2(kv);
+Ez_low_m2(kv)=Ez_low_m1(kv);
+Ez_low_m1(kv)=Ez(kv,2);
+Ez(kv,KE+1)=Ez_high_m2(kv);
+Ez_high_m2(kv)=Ez_high_m1(kv);
+Ez_high_m1(kv)=Ez(kv,KE);
+
+  for j=1:KE
+       Hy(kv,j)=Hy(kv,j)-dt/(mu_1*mu_0)/dz*(Ex(kv,j+1)-Ex(kv,j));
+       Hx(kv,j)=Hx(kv,j)+dt/(mu_1*mu_0)/dz*(Ey(kv,j+1)-Ey(kv,j));
+       Hz(kv,j)=Hz(kv,j);
+  end
+Ex_unplasma(n,:)=Ex(:);
+Ey_unplasma(n,:)=Ey(:);
+Ez_unplasma(n,:)=Ez(:);
+
+
+
+ for k=2:KE
+     Jx_p(kv,k)=GA_p(kv,k)*Jxm1_p(kv,k)+GB_p(kv,k)*Ex_p(kv,k)-GC_p(kv,k)*Jym1_p(kv,k)-GD_p(kv,k)*Ey_p(kv,k)+GE_p(kv,k)*Jzm1_p(kv,k)+GF_p(kv,k)*Ez_p(kv,k);
+     Jy_p(kv,k)=GG_p(kv,k)*Jym1_p(kv,k)+GH_p(kv,k)*Ey_p(kv,k)+GI_p(kv,k)*Jxm1_p(kv,k)+GJ_p(kv,k)*Ex_p(kv,k)+GK_p(kv,k)*Jzm1_p(kv,k)+GL_p(kv,k)*Ez_p(kv,k);
+     Jz_p(kv,k)=GM_p(kv,k)*Jzm1_p(kv,k)+GN_p(kv,k)*Ez_p(kv,k)-GO_p(kv,k)*Jxm1_p(kv,k)-GP_p(kv,k)*Ex_p(kv,k)+GK_p(kv,k)*Jym1_p(kv,k)+GL_p(kv,k)*Ey_p(kv,k);
+     Jxm1_p(kv,k)=Jx_p(kv,k);
+     Jym1_p(kv,k)=Jy_p(kv,k);
+     Jzm1_p(kv,k)=Jz_p(kv,k);
+ end
+
+
+Ex_p(kv,k_source)=Ex_p(kv,k_source)+pulse(n);
+
+for k=2:KE
+Ex_p(kv,k)=Ex_p(kv,k)-(dt/dz/(epsilon_1*epsilon_0))*(Hy_p(kv,k)-Hy_p(kv,k-1))-dt/(epsilon_1*epsilon_0)*Jx_p(kv,k);
+Ey_p(kv,k)=Ey_p(kv,k)+(dt/dz/(epsilon_1*epsilon_0))*(Hx_p(kv,k)-Hx_p(kv,k-1))-dt/(epsilon_1*epsilon_0)*Jy_p(kv,k);
+Ez_p(kv,k)=Ez_p(kv,k)-dt/(epsilon_1*epsilon_0)*Jz_p(kv,k);
+end
+
+for m=1:kk
+    Ex_tw(kv,m)=Ex_tw(kv,m)+Ex_p(kv,kend+1).*exp(-sqrt(-1)*omegadt(m)*n);
+    Ey_tw(kv,m)=Ey_tw(kv,m)+Ey_p(kv,kend+1).*exp(-sqrt(-1)*omegadt(m)*n);
+    Ez_tw(kv,m)=Ez_tw(kv,m)+Ez_p(kv,kend+1).*exp(-sqrt(-1)*omegadt(m)*n);
+  %% Et_RCP
+    Et_RCP(kv,m)=(Ex_tw(kv,m))+K_RCP(kv,m)*(Ey_tw(kv,m));
+  %% Et_LCP 
+    Et_LCP(kv,m)=(Ex_tw(kv,m))+K_LCP(kv,m)*(Ey_tw(kv,m));
+   
+     Ex_rw(kv,m)=Ex_rw(kv,m)+(Ex_p(kv,kstart-1)-Ex(kv,kstart-1)).*exp(-sqrt(-1)*omegadt(m)*n);
+     Ey_rw(kv,m)=Ey_rw(kv,m)+(Ey_p(kv,kstart-1)-Ey(kv,kstart-1)).*exp(-sqrt(-1)*omegadt(m)*n);
+     Ez_rw(kv,m)=Ez_rw(kv,m)+(Ez_p(kv,kstart-1)-Ez(kv,kstart-1)).*exp(-sqrt(-1)*omegadt(m)*n);
+       
+        %% Er_RCP
+       Er_RCP(kv,m)=(Ex_rw(kv,m))+K_RCP(kv,m)*(Ey_rw(kv,m));
+  %% Er_LCP 
+        Er_LCP(kv,m)=(Ex_rw(kv,m))+K_LCP(kv,m)*(Ey_rw(kv,m)); 
+        
+   
+end 
+
+
+
+Ex_p(kv,1)=Ex_low_m2_p(kv);
+Ex_low_m2_p(kv)=Ex_low_m1_p(kv);
+Ex_low_m1_p(kv)=Ex_p(kv,2);
+Ex_p(kv,KE+1)=Ex_high_m2_p(kv);
+Ex_high_m2_p(kv)=Ex_high_m1_p(kv);
+Ex_high_m1_p(kv)=Ex_p(kv,KE);
+
+Ey_p(kv,1)=Ey_low_m2_p(kv);
+Ey_low_m2_p(kv)=Ey_low_m1_p(kv);
+Ey_low_m1_p(kv)=Ey_p(kv,2);
+Ey_p(kv,KE+1)=Ey_high_m2_p(kv);
+Ey_high_m2_p(kv)=Ey_high_m1_p(kv);
+Ey_high_m1_p(kv)=Ey_p(kv,KE);
+
+Ez_p(kv,1)=Ez_low_m2_p(kv);
+Ez_low_m2_p(kv)=Ez_low_m1_p(kv);
+Ez_low_m1_p(kv)=Ez_p(kv,2);
+Ez_p(kv,KE+1)=Ez_high_m2_p(kv);
+Ez_high_m2_p(kv)=Ez_high_m1_p(kv);
+Ez_high_m1_p(kv)=Ez_p(kv,KE);
+
+for k=1:KE
+Hy_p(kv,k)=Hy_p(kv,k)+(dt/dz/(mu_1*mu_0))*(Ex_p(kv,k)-Ex_p(kv,k+1));
+Hx_p(kv,k)=Hx_p(kv,k)-(dt/dz/(mu_1*mu_0))*(Ey_p(kv,k)-Ey_p(kv,k+1));
+Hz_p(kv,k)=Hz_p(kv,k);
+end
+
+Ex_plasma(n,:)=Ex_p(:);
+Ey_plasma(n,:)=Ey_p(:);
+Ez_plasma(n,:)=Ez_p(:);
+
+Ex_plasma_r(n)=(Ex_p(kstart-1)-Ex(kstart-1));
+Ey_plasma_r(n)=(Ey_p(kstart-1)-Ey(kstart-1));
+Ez_plasma_r(n)=(Ez_p(kstart-1)-Ez(kstart-1));
+Ex_plasma_t(n)=Ex_p(kend+1);
+Ey_plasma_t(n)=Ey_p(kend+1);
+Ez_plasma_t(n)=Ez_p(kend+1);
+
+Hx_plasma(n,:)=Hx_p(:);
+Hy_plasma(n,:)=Hy_p(:);
+Hz_plasma(n,:)=Hz_p(:);
+
+Jx_plasma(n,:)=Jx_p(:);
+Jy_plasma(n,:)=Jy_p(:);
+Jz_plasma(n,:)=Jz_p(:);
+end
+end
+
+a1=abs( Er_RCP)./abs(Exr_w);%反射系数    注：Er_RCP即反射场
+a2=abs( Et_RCP)./abs(Ext_w);%透射系数      注：Et_RCP即透射场
+R_RCP=20*log10(a1);%反射系数
+T_RCP=20*log10(a2);%透射系数
+A_RCP=10*log10(1-abs(a1).^2-abs(a2).^2);
+
+b1=abs( Er_LCP)./abs(Exr_w);%反射系数    注：Er_LCP即反射场
+b2=abs( Et_LCP)./abs(Ext_w);%透射系数     注：Et_LCP即透射场
+
+R_LCP=20*log10(b1);%反射系数
+T_LCP=20*log10(b2);%透射系数
+A_LCP=10*log10(1-abs(b1).^2-abs(b2).^2);
+A_LCP1=1-abs(b1).^2-abs(b2).^2;
+toc
+
+
+
+figure('color',[1 1 1]);
+
+h=pcolor(Ex_plasma(1:4000,1:800));
+caxis([-0.01,0.01]);
+set(gca,'FontName','Times New Roman','FontSize',25)
+set(h,'edgecolor','none')
+colorbar
+xlabel('N')
+ylabel('t')
+
+title('Ex')
+
+
+figure(2)
+mesh(Hy_plasma)
+xlabel('N')
+ylabel('t')
+xlim([0 801])
+ylim([0 4000])
+title('Hy')
+subplot(3,2,1)
+plot(Ex_plasma_r)
+ylabel('Exr')
+subplot(3,2,2)
+plot(Ex_plasma_t)
+ylabel('Ext')
+subplot(3,2,3)
+plot(Ey_plasma_r)
+ylabel('Eyr')
+subplot(3,2,4)
+plot(Ey_plasma_t)
+ylabel('Eyt')
+subplot(3,2,5)
+plot(Ez_plasma_r)
+ylabel('Ezr')
+subplot(3,2,6)
+plot(Ez_plasma_t)
+ylabel('Ezt')
+ylim([-1e-29 1e-29])
+figure(2)
+subplot(3,3,1)
+mesh(Ex_plasma)
+xlim([0 801])
+xlabel('N')
+ylabel('t')
+title('Ex')
+subplot(3,3,2)
+mesh(Jx_plasma)
+xlabel('N')
+ylabel('t')
+xlim([0 801])
+title('Jx')
+subplot(3,3,3)
+mesh(Hx_plasma)
+xlabel('N')
+ylabel('t')
+xlim([0 801])
+title('Hx')
+subplot(3,3,4)
+mesh(Ey_plasma)
+xlabel('N')
+ylabel('t')
+xlim([0 801])
+title('Ey')
+subplot(3,3,5)
+mesh(Jy_plasma)
+xlabel('N')
+ylabel('t')
+xlim([0 801])
+title('Jy')
+subplot(3,3,6)
+mesh(Hy_plasma)
+xlabel('N')
+ylabel('t')
+xlim([0 801])
+title('Hy')
+subplot(3,3,7)
+xlabel('N')
+ylabel('t')
+mesh(Ez_plasma)
+xlim([0 801])
+title('Ez')
+subplot(3,3,8)
+mesh(Jz_plasma)
+xlabel('N')
+ylabel('t')
+xlim([0 801])
+title('Jz')
+subplot(3,3,9)
+mesh(Hz_plasma)
+xlabel('N')
+ylabel('t')
+xlim([0 801])
+title('Hz')
+figure(3)
+subplot(3,1,1)
+plot(freq/1e9,R_RCP,'ro',f/1e9,R_R)
+xlabel('frequency')
+ylabel('reflection coefficient')
+subplot(3,1,2)
+plot(freq/1e9,A_RCP,'ro',f/1e9,A_R)
+xlabel('frequency')
+ylabel('Absorption coefficient')
+subplot(3,1,3)
+plot(freq/1e9,T_RCP,'ro',f/1e9,T_R)
+xlabel('frequency')
+ylabel('Transmission coefficient')
+figure(4)
+subplot(3,1,1)
+plot(freq/1e9,R_LCP,'ro',f/1e9,R_L)
+xlabel('frequency')
+ylabel('reflection coefficient')
+subplot(3,1,2)
+plot(freq/1e9,A_LCP,'ro',f/1e9,A_L)
+xlabel('frequency')
+ylabel('Absorption coefficient')
+subplot(3,1,3)
+plot(freq/1e9,T_LCP,'ro',f/1e9,T_L)
+xlabel('frequency')
+ylabel('Transmission coefficient')
+
+Explasma1(:,:)=Ex_plasma(151:650,200:399);
+Eyplasma1(:,:)=Ey_plasma(151:650,200:399);
+u(:,:)=Ez_plasma(151:650,200:399);
+Jxplasma1(:,:)=Jx_plasma(151:650,200:399);
+Jyplasma1(:,:)=Jy_plasma(151:650,200:399);
+v(:,:)=Jz_plasma(151:650,200:399);
+Hxplasma1(:,:)=Hx_plasma(151:650,200:399);
+Hyplasma1(:,:)=Hy_plasma(151:650,200:399);
+Hzplasma1(:,:)=Hz_plasma(151:650,200:399);
+f_max=100e9;
+wl=40;
+c=3e8;
+dx=c/f_max/wl;
+dt=dx/(2*c);
+xlim([0 801])
+ylim([0 4000])
+x=linspace(0,dx*199,200);
+t=linspace(0,dt*499,500);
+save('C:\Users\15307\Desktop\initialdata.mat','Ex_plasma','Hy_plasma','Jx_plasma','Jz_plasma','Ez_plasma','x','t')
+
+
+
+
+
+
+
